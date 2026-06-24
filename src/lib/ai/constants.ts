@@ -12,10 +12,16 @@
 /** Default model — Flash-Lite for best free-tier throughput during development */
 export const DEFAULT_AUDIT_MODEL = 'gemini-2.5-flash-lite';
 
-/** Models to try in order when the primary returns 503 (capacity, not quota) */
+/**
+ * Models tried in order on 429 (quota) or 503 (overloaded).
+ * Each model has its own separate free-tier quota bucket.
+ * Order: highest free quota first.
+ * Note: gemini-1.5-x removed — not available on v1beta generateContent.
+ */
 export const MODEL_FALLBACK_CHAIN = [
   'gemini-2.5-flash-lite',
   'gemini-2.5-flash',
+  'gemini-2.0-flash-lite',
   'gemini-2.0-flash',
 ] as const;
 

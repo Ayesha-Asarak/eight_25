@@ -74,7 +74,8 @@ export async function callGemini(params: {
 
   const ai = new GoogleGenAI({ apiKey });
   const models = getModelFallbackChain();
-  let last503: unknown;
+  let lastQuotaErr: unknown;
+  let lastUnavailableErr: unknown;
 
   for (const model of models) {
     try {
@@ -103,6 +104,7 @@ export async function callGemini(params: {
           }
         : undefined;
 
+      console.info(`[ai] successful response from ${model}`);
       return { rawContent, usage };
     } catch (err) {
       if (err instanceof OpenAIResponseError) throw err;
@@ -110,26 +112,34 @@ export async function callGemini(params: {
       const status = getErrorStatus(err);
       const message = getErrorMessage(err);
 
-      // Quota/auth errors won't succeed on another model — fail immediately
+      // Auth errors will fail on every model — stop immediately
       if (
-        status === 429 ||
-        /quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(message)
+        status === 400 ||
+        /api key|INVALID_ARGUMENT/i.test(message)
       ) {
-        throw new QuotaExceededError(err);
-      }
-
-      if (/api key/i.test(message)) {
         throw new MissingApiKeyError(
           'GEMINI_API_KEY was rejected by Google. Check the key in .env.local is saved (Cmd+S) and restart the dev server.',
         );
       }
 
-      // 503 — try the next model in the chain
+      // 429 quota exceeded — this model is exhausted, try the next one
+      if (
+        status === 429 ||
+        /quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(message)
+      ) {
+        console.warn(`[ai] ${model} quota exhausted — trying next model`);
+        lastQuotaErr = err;
+        continue;
+      }
+
+      // 503 overloaded or 404 not found — try the next model
       if (
         status === 503 ||
-        /high demand|UNAVAILABLE|overloaded/i.test(message)
+        status === 404 ||
+        /high demand|UNAVAILABLE|overloaded|not found/i.test(message)
       ) {
-        last503 = err;
+        console.warn(`[ai] ${model} skipped (${status}) — trying next model`);
+        lastUnavailableErr = err;
         continue;
       }
 
@@ -137,7 +147,9 @@ export async function callGemini(params: {
     }
   }
 
-  throw new ModelUnavailableError(last503);
+  // All models exhausted
+  if (lastQuotaErr) throw new QuotaExceededError(lastQuotaErr);
+  throw new ModelUnavailableError(lastUnavailableErr);
 }
 
 // Keep legacy export alias so existing tests and imports don't break
