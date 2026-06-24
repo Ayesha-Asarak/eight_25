@@ -123,8 +123,11 @@ src/
 
 Errors propagate upward through typed domain classes and are mapped to HTTP responses by `mapToAuditError()` in `src/lib/api/map-error.ts`.
 
-| Error class | Source | HTTP status | Client code |
-|-------------|--------|-------------|-------------|
+Rate limit violations are checked **before** the pipeline runs in `src/app/api/audit/route.ts` using `checkRateLimit()` from `src/lib/api/rate-limit.ts`.
+
+| Error / condition | Source | HTTP status | Client code |
+|-------------------|--------|-------------|-------------|
+| Rate limit exceeded | `checkRateLimit` | 429 | `RATE_LIMITED` |
 | `ZodError` | `validateAuditRequest` | 400 | `INVALID_URL` |
 | `FetchError` | `fetchPage` | 422 | `FETCH_FAILED` |
 | `ParseError` | `parseHtml` | 422 | `PARSE_FAILED` |
@@ -182,3 +185,4 @@ See `docs/prompt-logs/README.md` for the full format specification.
 | Single retry on validation failure | `MAX_VALIDATION_RETRIES = 1` | Handles rare model lapses without infinite loops or significant latency increase |
 | Vercel Hobby timeout | `maxDuration = 60` (Pro only) | Hobby plan caps at 10s; documented in README; upgrade path is clear |
 | No caching | Stateless per-request | Simplest deployment; appropriate for an assignment-scope tool |
+| In-memory rate limiter | `src/lib/api/rate-limit.ts` | 5 req / 15 min per IP; resets on cold start; not shared across Vercel instances — appropriate for low-traffic public deployment |

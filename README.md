@@ -98,6 +98,7 @@ System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/p
 | **Some sites block headless fetchers** | Pages behind Cloudflare bot protection, login walls, or requiring JavaScript rendering will return a `FETCH_FAILED` error. |
 | **Vercel Hobby plan timeout** | The API route sets `maxDuration = 60` seconds, but Vercel Hobby plan caps serverless functions at 10 seconds. Slow target sites or high OpenAI latency may cause timeout errors on Hobby. Upgrade to Pro for reliable 60s execution. |
 | **Single page only** | The tool audits exactly one URL per request. No sitemap crawling, no multi-page analysis. |
+| **In-memory rate limiting** | The API allows 5 requests per IP per 15 minutes. The counter resets on every Vercel cold start and is not shared across serverless instances. |
 
 ---
 
