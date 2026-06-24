@@ -15,11 +15,11 @@ out/
 .env.production.local
 
 # Prompt logs: runtime logs are ignored; only curated examples are committed
-docs/prompt-logs/**/*
-!docs/prompt-logs/README.md
-!docs/prompt-logs/examples/
-!docs/prompt-logs/examples/**
-!docs/prompt-logs/.gitkeep
+# docs/prompt-logs/**/*
+# !docs/prompt-logs/README.md
+# !docs/prompt-logs/examples/
+# !docs/prompt-logs/examples/**
+# !docs/prompt-logs/.gitkeep
 
 # Misc
 .DS_Store
