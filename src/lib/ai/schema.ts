@@ -1,11 +1,10 @@
 /**
- * JSON Schema for OpenAI structured output mode.
+ * JSON Schema reference for Gemini structured output.
  *
  * This is the hand-written JSON schema that mirrors AuditInsightsSchema (Zod).
- * It is passed to response_format.json_schema for reliable structured output.
+ * Passed to Gemini responseJsonSchema for reliable structured output on the native API.
  *
  * Design decision: hand-written instead of zod-to-json-schema because:
- * - OpenAI strict mode has specific requirements (no $defs, additionalProperties: false)
  * - Avoids an extra dependency
  * - Easier to audit for correctness
  *
@@ -72,3 +71,6 @@ export const AUDIT_INSIGHTS_JSON_SCHEMA = {
     additionalProperties: false,
   },
 } as const;
+
+/** Inner schema object for Gemini native API responseJsonSchema */
+export const GEMINI_AUDIT_INSIGHTS_SCHEMA = AUDIT_INSIGHTS_JSON_SCHEMA.schema;

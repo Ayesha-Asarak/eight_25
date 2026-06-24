@@ -12,9 +12,10 @@ export class AnalysisError extends Error {
 }
 
 export class MissingApiKeyError extends AnalysisError {
-  constructor() {
+  constructor(detail?: string) {
     super(
-      'OPENAI_API_KEY is not set. Add it to .env.local and restart the dev server.',
+      detail ??
+        'GEMINI_API_KEY is not set. Add it to .env.local and restart the dev server.',
     );
     this.name = 'MissingApiKeyError';
   }
@@ -22,8 +23,28 @@ export class MissingApiKeyError extends AnalysisError {
 
 export class OpenAIResponseError extends AnalysisError {
   constructor(reason: string, cause?: unknown) {
-    super(`OpenAI returned an unexpected response: ${reason}`);
+    super(`Gemini returned an unexpected response: ${reason}`);
     this.name = 'OpenAIResponseError';
+    this.cause = cause;
+  }
+}
+
+export class QuotaExceededError extends AnalysisError {
+  constructor(cause?: unknown) {
+    super(
+      'Gemini API quota exceeded. Wait a minute and try again, or create a new API key in a fresh Google Cloud project at https://aistudio.google.com/app/apikey.',
+    );
+    this.name = 'QuotaExceededError';
+    this.cause = cause;
+  }
+}
+
+export class ModelUnavailableError extends AnalysisError {
+  constructor(cause?: unknown) {
+    super(
+      'Gemini is temporarily overloaded (503). Wait a minute and try again — your API key is fine.',
+    );
+    this.name = 'ModelUnavailableError';
     this.cause = cause;
   }
 }

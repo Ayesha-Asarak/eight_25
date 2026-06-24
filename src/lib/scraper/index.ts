@@ -20,7 +20,7 @@ export interface ScrapeResult {
  *   - raw HTML (for debugging)
  *   - Cheerio root (in case the route needs DOM access)
  *   - fully validated PageMetrics
- *   - plain-text content excerpt for OpenAI
+ *   - plain-text content excerpt for Gemini
  *
  * The API route calls this function; it never calls individual extractors directly.
  */

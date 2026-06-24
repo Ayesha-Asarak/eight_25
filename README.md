@@ -1,6 +1,6 @@
 # Website Audit Tool — EIGHT25MEDIA
 
-> AI-powered single-page website auditor. Extracts factual metrics deterministically, then generates structured insights using OpenAI gpt-4o. Factual data and AI output are kept strictly separate throughout — in the code, the API, and the UI.
+> AI-powered single-page website auditor. Extracts factual metrics deterministically, then generates structured insights using Google Gemini 2.0 Flash. Factual data and AI output are kept strictly separate throughout — in the code, the API, and the UI.
 
 **Live Demo:** https://eight25-website-audit.vercel.app _(replace with your deployed URL)_
 
@@ -57,9 +57,9 @@ Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## AI Design Decisions
 
-### 1. Structured JSON output (`response_format: json_schema`)
+### 1. Prompt-enforced JSON output
 
-The OpenAI call uses `response_format: { type: "json_schema" }` with a hand-written JSON schema matching `AuditInsightsSchema`. This guarantees the model returns parseable, schema-conformant JSON rather than free-text — eliminating the need for fragile regex or prose parsing.
+The Gemini API call does not use `response_format` (not supported reliably on Gemini's OpenAI-compat endpoint). Instead, the system prompt instructs the model to output only valid JSON matching `AuditInsightsSchema`. The response is stripped of any markdown code fences before parsing, and Zod validates the result before it reaches the API route.
 
 ### 2. Metrics extracted first, sent as structured data
 
@@ -96,7 +96,7 @@ System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/p
 | **CTA heuristic is approximate** | CTAs are detected by tag name, `role="button"`, CSS class keywords (`btn`, `cta`), and link text patterns. JavaScript-rendered buttons and CSS-only styled CTAs are not detected. |
 | **Content truncated at 5000 characters** | Pages longer than ~5000 characters of body text will have their content partially analysed. Deep-page content (footers, FAQs) may not influence AI findings. |
 | **Some sites block headless fetchers** | Pages behind Cloudflare bot protection, login walls, or requiring JavaScript rendering will return a `FETCH_FAILED` error. |
-| **Vercel Hobby plan timeout** | The API route sets `maxDuration = 60` seconds, but Vercel Hobby plan caps serverless functions at 10 seconds. Slow target sites or high OpenAI latency may cause timeout errors on Hobby. Upgrade to Pro for reliable 60s execution. |
+| **Vercel Hobby plan timeout** | The API route sets `maxDuration = 60` seconds, but Vercel Hobby plan caps serverless functions at 10 seconds. Slow target sites or high Gemini latency may cause timeout errors on Hobby. Upgrade to Pro for reliable 60s execution. |
 | **Single page only** | The tool audits exactly one URL per request. No sitemap crawling, no multi-page analysis. |
 | **In-memory rate limiting** | The API allows 5 requests per IP per 15 minutes. The counter resets on every Vercel cold start and is not shared across serverless instances. |
 
@@ -105,7 +105,7 @@ System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/p
 ## Future Improvements
 
 - ~~Lighthouse integration~~ — implemented in Phase 6 via Google PageSpeed Insights API (see Factual Metrics)
-- **Result caching** — cache `AuditResult` per URL hash (Redis/Vercel KV) to avoid redundant OpenAI calls
+- **Result caching** — cache `AuditResult` per URL hash (Redis/Vercel KV) to avoid redundant Gemini calls
 - **Side-by-side comparison** — compare two URLs and highlight metric deltas
 - **Export as PDF** — allow users to download the full audit report
 - **Rate limiting** — add IP-based rate limiting on `POST /api/audit` to prevent abuse
@@ -172,7 +172,7 @@ docs/
 | Framework | Next.js 15 App Router + TypeScript | Full-stack, API routes, Vercel-ready |
 | Styling | Tailwind CSS v4 | Rapid, consistent, agency-quality UI |
 | HTML parsing | Cheerio | Lightweight, jQuery-like, server-side only |
-| AI provider | OpenAI gpt-4o | Structured JSON output, best reasoning quality |
+| AI provider | Google Gemini 2.5 Flash-Lite | Highest free-tier quota; override with `GEMINI_MODEL` |
 | Schema validation | Zod | End-to-end type safety from API to UI |
 | Testing | Vitest | Fast, ESM-native, path alias support |
 | Deployment | Vercel | Native Next.js support |
@@ -196,7 +196,10 @@ npm run lint         # ESLint
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenAI API key — used by `src/lib/ai/openai-client.ts` |
+| `GEMINI_API_KEY` | Yes | Google Gemini API key — get a free key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
+| `GEMINI_MODEL` | No | Gemini model id (default: `gemini-2.5-flash-lite` for best free-tier quota) |
 | `GOOGLE_PAGESPEED_API_KEY` | No | Google PageSpeed Insights API key — higher quota; without it the API works at ~2 req/100s per IP |
+
+**Gemini free-tier note:** Quota is shared per Google Cloud *project*, not per API key. Creating multiple keys in the same project does not increase limits. Use Flash-Lite (default), wait for the daily reset (midnight Pacific), or create a key in a *new* AI Studio project.
 
 Copy `.env.example` to `.env.local` and fill in the key. Never commit `.env.local`.

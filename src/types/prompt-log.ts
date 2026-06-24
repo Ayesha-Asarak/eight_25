@@ -1,7 +1,7 @@
 import type { PageMetrics, AuditInsights } from './audit';
 
 /**
- * Structured input that gets sent to OpenAI.
+ * Structured input that gets sent to Gemini.
  * Metrics are included as-is; HTML is never sent — only a truncated text excerpt.
  */
 export interface AIStructuredInput {
@@ -12,7 +12,7 @@ export interface AIStructuredInput {
 }
 
 /**
- * Full prompt log entry — one per OpenAI call.
+ * Full prompt log entry — one per Gemini call.
  * Written to docs/prompt-logs/{date}/{id}.md in development.
  * Curated examples committed to docs/prompt-logs/examples/ for submission.
  */
@@ -26,11 +26,11 @@ export interface PromptLogEntry {
   systemPrompt: string;
   userPrompt: string;
   structuredInput: AIStructuredInput;
-  /** Raw string from OpenAI before JSON.parse or Zod validation */
+  /** Raw string from Gemini before JSON.parse or Zod validation */
   rawModelOutput: string;
   /** Parsed and validated output — undefined if validation failed */
   parsedOutput?: AuditInsights;
-  /** OpenAI usage stats if available */
+  /** Gemini usage stats if available */
   usage?: {
     promptTokens: number;
     completionTokens: number;

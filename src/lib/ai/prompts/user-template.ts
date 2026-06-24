@@ -1,7 +1,8 @@
 import type { AIStructuredInput } from '@/types/prompt-log';
+import { CONTENT_EXCERPT_MAX_LENGTH } from '@/lib/ai/constants';
 
 /**
- * Builds the user message sent to OpenAI for each audit.
+ * Builds the user message sent to Gemini for each audit.
  *
  * Design decisions:
  * - Metrics are pretty-printed JSON so they are readable in prompt logs
@@ -13,7 +14,7 @@ export function buildUserPrompt(input: AIStructuredInput): string {
   const metricsJson = JSON.stringify(input.metrics, null, 2);
   const excerptNote =
     input.contentExcerpt.endsWith('…')
-      ? '(truncated to 5000 characters)'
+      ? `(truncated to ${CONTENT_EXCERPT_MAX_LENGTH} characters)`
       : `(${input.contentExcerpt.length} characters)`;
 
   return `Audit the following webpage and return a structured JSON analysis.

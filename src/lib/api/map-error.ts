@@ -2,7 +2,9 @@ import { ZodError } from 'zod';
 import { FetchError, ParseError } from '@/lib/scraper/errors';
 import {
   MissingApiKeyError,
+  ModelUnavailableError,
   OpenAIResponseError,
+  QuotaExceededError,
   ValidationError,
 } from '@/lib/ai/errors';
 import type { AuditErrorResponse } from '@/types/api';
@@ -55,6 +57,28 @@ export function mapToAuditError(err: unknown): MappedError {
       body: {
         error: 'AI analysis is not configured. Please contact the administrator.',
         code: 'AI_FAILED',
+      },
+    };
+  }
+
+  if (err instanceof ModelUnavailableError) {
+    return {
+      status: 503,
+      body: {
+        error:
+          'Gemini is temporarily overloaded. Wait about a minute and try again — your API key is working.',
+        code: 'AI_FAILED',
+      },
+    };
+  }
+
+  if (err instanceof QuotaExceededError) {
+    return {
+      status: 429,
+      body: {
+        error:
+          'Gemini API quota exceeded. Wait about a minute and try again, or create a new API key in a fresh project at aistudio.google.com/app/apikey.',
+        code: 'RATE_LIMITED',
       },
     };
   }

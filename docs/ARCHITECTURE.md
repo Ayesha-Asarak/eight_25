@@ -1,6 +1,6 @@
 # Architecture — Website Audit Tool
 
-This document describes the internal architecture of the EIGHT25MEDIA Website Audit Tool: a Next.js 15 App Router application that fetches a single URL, extracts factual metrics deterministically, and generates structured AI insights using OpenAI gpt-4o.
+This document describes the internal architecture of the EIGHT25MEDIA Website Audit Tool: a Next.js 15 App Router application that fetches a single URL, extracts factual metrics deterministically, and generates structured AI insights using Google Gemini 2.0 Flash.
 
 ---
 
@@ -26,7 +26,7 @@ sequenceDiagram
   participant Scraper as scrapePage
   participant Metrics as extractMetrics
   participant AI as analyzePage
-  participant OpenAI
+  participant Gemini as Gemini API
   participant Logger as writePromptLog
 
   User->>AuditPage: Enter URL, click Run Audit
@@ -40,8 +40,8 @@ sequenceDiagram
   API->>AI: analyzePage(metrics, contentExcerpt)
   AI->>AI: buildAIStructuredInput(metrics, excerpt)
   AI->>AI: buildUserPrompt(input)
-  AI->>OpenAI: chat.completions.create (json_schema)
-  OpenAI-->>AI: raw JSON string
+  AI->>Gemini: chat.completions.create (prompt-enforced JSON)
+  Gemini-->>AI: raw JSON string (markdown fences stripped)
   AI->>AI: AuditInsightsSchema.parse(rawContent)
   AI->>Logger: writePromptLog(entry)
   Logger-->>AI: filePath
@@ -56,12 +56,12 @@ sequenceDiagram
 
 | Layer | Directory | Owns | Forbidden |
 |-------|-----------|------|-----------|
-| **Scraper** | `src/lib/scraper/` | HTTP fetch with timeout and User-Agent; Cheerio DOM loading; public `scrapePage()` entrypoint | OpenAI imports; metric logic |
-| **Metrics** | `src/lib/metrics/` | Pure extractor functions for each metric group; `extractMetrics()` orchestrator; `contentExcerpt` extraction | OpenAI imports; fetch logic; PageSpeed |
-| **Performance** | `src/lib/performance/` | Google PageSpeed Insights API v5 fetch; parse 4 Lighthouse category scores; graceful null fallback | OpenAI imports; Cheerio; metric extraction |
-| **AI** | `src/lib/ai/` | `AIStructuredInput` assembly; system and user prompt rendering; OpenAI API call with `json_schema` output; Zod validation; retry logic | Direct fetch; Cheerio |
+| **Scraper** | `src/lib/scraper/` | HTTP fetch with timeout and User-Agent; Cheerio DOM loading; public `scrapePage()` entrypoint | AI/Gemini imports; metric logic |
+| **Metrics** | `src/lib/metrics/` | Pure extractor functions for each metric group; `extractMetrics()` orchestrator; `contentExcerpt` extraction | AI/Gemini imports; fetch logic; PageSpeed |
+| **Performance** | `src/lib/performance/` | Google PageSpeed Insights API v5 fetch; parse 4 Lighthouse category scores; graceful null fallback | AI/Gemini imports; Cheerio; metric extraction |
+| **AI** | `src/lib/ai/` | `AIStructuredInput` assembly; system and user prompt rendering; Gemini API call (prompt-enforced JSON); markdown-fence strip; Zod validation; retry logic | Direct fetch; Cheerio |
 | **Logging** | `src/lib/logging/` | Markdown prompt log formatting; filesystem write (`docs/prompt-logs/{date}/`) | Business logic; metric extraction |
-| **API route** | `src/app/api/audit/` | Request validation; parallel orchestration of `scrapePage` + `fetchPageSpeedScores`; typed error mapping | Inline prompts; direct OpenAI calls |
+| **API route** | `src/app/api/audit/` | Request validation; parallel orchestration of `scrapePage` + `fetchPageSpeedScores`; typed error mapping | Inline prompts; direct Gemini calls |
 | **UI** | `src/app/`, `src/components/` | Client state machine (`useAudit`); form; results panels with visual separation | Any server-side logic; AI imports |
 | **Types** | `src/types/` | Zod schemas and inferred TypeScript types shared across all layers | Implementation logic |
 
@@ -92,8 +92,8 @@ src/
 │   │   │   ├── system.ts             # Static system prompt
 │   │   │   └── user-template.ts      # Dynamic user prompt builder
 │   │   ├── build-input.ts            # AIStructuredInput assembly
-│   │   ├── schema.ts                 # JSON schema for OpenAI response_format
-│   │   ├── openai-client.ts          # callOpenAI() — single OpenAI wrapper
+│   │   ├── schema.ts                 # JSON schema reference for AuditInsightsSchema
+│   │   ├── openai-client.ts          # callGemini() — single Gemini API wrapper
 │   │   ├── analyze-page.ts           # analyzePage() — full AI orchestrator
 │   │   ├── constants.ts              # AUDIT_MODEL, CONTENT_EXCERPT_MAX_LENGTH
 │   │   ├── errors.ts                 # AnalysisError, ValidationError, etc.
@@ -132,9 +132,9 @@ Rate limit violations are checked **before** the pipeline runs in `src/app/api/a
 | `ZodError` | `validateAuditRequest` | 400 | `INVALID_URL` |
 | `FetchError` | `fetchPage` | 422 | `FETCH_FAILED` |
 | `ParseError` | `parseHtml` | 422 | `PARSE_FAILED` |
-| `MissingApiKeyError` | `callOpenAI` | 500 | `AI_FAILED` |
+| `MissingApiKeyError` | `callGemini` | 500 | `AI_FAILED` |
 | `ValidationError` | `AuditInsightsSchema.parse` (after retry) | 502 | `AI_FAILED` |
-| `OpenAIResponseError` | `callOpenAI` | 502 | `AI_FAILED` |
+| `OpenAIResponseError` | `callGemini` | 502 | `AI_FAILED` |
 | `unknown` | Any unhandled error | 500 | `UNKNOWN` |
 
 The client-side `useAudit` hook maps these to human-readable error messages displayed in the `ErrorState` component. Full error details are always logged server-side via `console.error`.
