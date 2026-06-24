@@ -1,0 +1,59 @@
+{
+  "seo": {
+    "summary": "The page has a clear meta title and description, and a single H1, which provides a solid SEO foundation.",
+    "findings": [
+      "metaTitle is present and well-formed at 51 characters — within the recommended 50–60 character range.",
+      "metaDescription is present at 88 characters — within the optimal 120–160 character range, though more specific.",
+      "h1Count is 1 — correct; only one primary heading found. h2Count is 3, providing reasonable content structure."
+    ]
+  },
+  "messaging": {
+    "summary": "The messaging is focused on B2B agency positioning but could be more specific about differentiators.",
+    "findings": [
+      "The content excerpt opens with a clear value proposition referencing SEO and conversion — strong above-the-fold messaging.",
+      "wordCount is 487 — sufficient for a homepage but limited for establishing deep expertise signals."
+    ]
+  },
+  "cta": {
+    "summary": "CTA usage is adequate with 4 detected calls-to-action, appropriate for a marketing homepage.",
+    "findings": [
+      "ctaCount is 4 — reasonable for a homepage. Ratio of 1 CTA per ~122 words is within best practice range.",
+      "CTA language in excerpt includes action-oriented phrases appropriate for B2B lead generation."
+    ]
+  },
+  "contentDepth": {
+    "summary": "Content depth is moderate; the word count supports basic SEO but may benefit from more supporting detail.",
+    "findings": [
+      "wordCount is 487 — above the 300-word minimum threshold for indexable content.",
+      "h2Count is 3 with h3Count of 2 — reasonable sectioning for the word count, aiding scannability."
+    ]
+  },
+  "ux": {
+    "summary": "Image accessibility needs improvement; alt text coverage is below the recommended threshold.",
+    "findings": [
+      "altTextPercent is 67 — approximately 2 of 6 images are missing alt text, creating accessibility and SEO gaps.",
+      "imageCount is 6 — good visual content presence. Fixing alt text on remaining images is a quick win.",
+      "internalLinks is 12 vs externalLinks is 3 — healthy internal linking ratio supports site architecture."
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": 1,
+      "title": "Add alt text to all images",
+      "reasoning": "altTextPercent is 67, meaning approximately 2 of the 6 images (imageCount: 6) lack descriptive alt attributes. This harms both accessibility compliance (WCAG AA) and image search indexability.",
+      "metricRefs": ["altTextPercent", "imageCount"]
+    },
+    {
+      "priority": 2,
+      "title": "Expand meta description specificity",
+      "reasoning": "metaDescription is present but at 88 characters it is well below the 150-character optimal length. A more specific description improves click-through rates from search results.",
+      "metricRefs": ["metaDescription"]
+    },
+    {
+      "priority": 3,
+      "title": "Increase content depth on key service pages",
+      "reasoning": "wordCount is 487 — while adequate for a homepage, supporting pages likely need 800–1200 words to compete in organic search for target keywords.",
+      "metricRefs": ["wordCount", "h2Count"]
+    }
+  ]
+}

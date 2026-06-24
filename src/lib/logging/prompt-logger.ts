@@ -1,38 +1,96 @@
-/**
- * Prompt Logger — Phase 0 stub
- *
- * Full implementation in Phase 2.
- * Stubs are typed and exported so other modules can import without breaking.
- *
- * Responsibilities (Phase 2):
- * - formatPromptLogMarkdown: render a PromptLogEntry as a Markdown string
- * - writePromptLog: write the markdown file to docs/prompt-logs/{date}/{id}.md
- *   in development; write to /tmp in production (Vercel)
- */
-
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 import type { PromptLogEntry } from '@/types/prompt-log';
 
 /**
- * Renders a PromptLogEntry as a Markdown document matching the required
- * submission format defined in .cursor/skills/prompt-logging/SKILL.md.
- *
- * @stub — implement in Phase 2
+ * Renders a PromptLogEntry as a Markdown document.
+ * Format matches the spec in .cursor/skills/prompt-logging/SKILL.md
+ * and docs/prompt-logs/README.md.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function formatPromptLogMarkdown(_entry: PromptLogEntry): string {
-  throw new Error('formatPromptLogMarkdown: not implemented — Phase 2');
+export function formatPromptLogMarkdown(entry: PromptLogEntry): string {
+  const usageNote = entry.usage
+    ? `- Prompt tokens: ${entry.usage.promptTokens} | Completion: ${entry.usage.completionTokens} | Total: ${entry.usage.totalTokens}`
+    : '- Token usage: not available';
+
+  const parsedStatus = entry.parsedOutput
+    ? '- Validation: passed'
+    : '- Validation: FAILED (parsedOutput is undefined)';
+
+  return `## Audit: ${entry.url} — ${entry.timestamp}
+
+### System Prompt
+
+${entry.systemPrompt}
+
+---
+
+### User Prompt (constructed)
+
+${entry.userPrompt}
+
+---
+
+### Structured Input (sent to model)
+
+\`\`\`json
+${JSON.stringify(entry.structuredInput, null, 2)}
+\`\`\`
+
+---
+
+### Raw Model Output
+
+\`\`\`json
+${entry.rawModelOutput}
+\`\`\`
+
+---
+
+### Notes
+
+- ID: ${entry.id}
+- Model: ${entry.model}
+- Timestamp: ${entry.timestamp}
+${usageNote}
+${parsedStatus}
+- Redactions: OPENAI_API_KEY not included; full page HTML not sent to model
+`;
 }
 
 /**
  * Writes a prompt log entry to the filesystem.
  *
- * Development: docs/prompt-logs/{YYYY-MM-DD}/{id}.md
- * Production:  /tmp/prompt-logs/{id}.md  (ephemeral — commit curated examples manually)
+ * Development (NODE_ENV !== 'production'):
+ *   docs/prompt-logs/{YYYY-MM-DD}/{id}.md
  *
- * @returns the file path written
- * @stub — implement in Phase 2
+ * Production (Vercel):
+ *   /tmp/prompt-logs/{id}.md  — ephemeral; commit curated examples manually
+ *
+ * @returns the absolute path of the written file
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function writePromptLog(_entry: PromptLogEntry): Promise<string> {
-  throw new Error('writePromptLog: not implemented — Phase 2');
+export async function writePromptLog(
+  entry: PromptLogEntry,
+  /** Override the output directory (used in tests to avoid writing into the repo) */
+  overrideDir?: string,
+): Promise<string> {
+  const markdown = formatPromptLogMarkdown(entry);
+
+  let dirPath: string;
+
+  if (overrideDir) {
+    dirPath = overrideDir;
+  } else if (process.env.NODE_ENV === 'production') {
+    dirPath = '/tmp/prompt-logs';
+  } else {
+    const dateStr = entry.timestamp.slice(0, 10); // YYYY-MM-DD
+    // cwd() is the repo root during Next.js dev/build
+    dirPath = join(process.cwd(), 'docs', 'prompt-logs', dateStr);
+  }
+
+  await mkdir(dirPath, { recursive: true });
+
+  const filePath = join(dirPath, `${entry.id}.md`);
+  await writeFile(filePath, markdown, 'utf-8');
+
+  return filePath;
 }
