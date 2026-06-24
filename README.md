@@ -1,8 +1,8 @@
 # Website Audit Tool — EIGHT25MEDIA
 
-> AI-powered single-page website auditor. Extracts factual metrics deterministically, then generates structured insights using Google Gemini 2.0 Flash. Factual data and AI output are kept strictly separate throughout — in the code, the API, and the UI.
+> AI-powered single-page website auditor built for EIGHT25MEDIA. Extracts 11 factual metrics deterministically, then generates structured insights using Google Gemini. Factual data and AI output are kept strictly separate throughout — in the code, the API, and the UI.
 
-**Live Demo:** https://eight25-website-audit.vercel.app _(replace with your deployed URL)_
+**Live Demo:** [https://eight-25.vercel.app](https://eight-25.vercel.app)
 
 ---
 
@@ -13,7 +13,7 @@ git clone https://github.com/Ayesha-Asarak/eight_25.git
 cd eight_25
 npm install
 cp .env.example .env.local
-# Edit .env.local and set OPENAI_API_KEY=sk-...
+# Edit .env.local — set GEMINI_API_KEY (see Environment Variables below)
 npm run dev
 ```
 
@@ -23,7 +23,7 @@ Open [http://localhost:3000](http://localhost:3000), enter any public URL, and c
 
 ## Architecture Overview
 
-The audit pipeline follows a strict unidirectional flow with enforced layer boundaries:
+The audit pipeline follows a strict unidirectional flow with enforced layer boundaries. No layer can import from a layer ahead of it.
 
 ```
 User URL
@@ -31,61 +31,109 @@ User URL
    ▼
 POST /api/audit
    │
-   ├─► scrapePage()         src/lib/scraper/    fetch HTML → Cheerio DOM
-   │       │
-   │       ▼
-   │   extractMetrics()     src/lib/metrics/    11 deterministic metrics
-   │       │
-   ├─► analyzePage()        src/lib/ai/         build input → gpt-4o → Zod validate
-   │       │
-   │       ├─► writePromptLog()   src/lib/logging/   full trace to docs/prompt-logs/
-   │       │
-   │       └─► AuditInsights
+   ├─► scrapePage()          src/lib/scraper/
+   │       ├─ fetch-page.ts       HTTP fetch with timeout + User-Agent
+   │       └─ parse-html.ts       Cheerio DOM loading
+   │
+   ├─► extractMetrics()      src/lib/metrics/
+   │       └─ 11 deterministic extractors (zero AI imports)
+   │
+   ├─► fetchPageSpeed()      src/lib/performance/
+   │       └─ Google PageSpeed Insights API (runs in parallel with scrape)
+   │
+   ├─► analyzePage()         src/lib/ai/
+   │       ├─ build-input.ts       structured JSON payload (never raw HTML)
+   │       ├─ prompts/system.ts    expert persona + anti-loop constraints
+   │       ├─ prompts/user-template.ts  rendered user prompt with metric values
+   │       ├─ openai-client.ts     callGemini() with model fallback chain
+   │       └─ writePromptLog()     full trace → docs/prompt-logs/
    │
    └─► AuditResult → UI
-           │
-           ├── MetricsPanel        (blue)   factual only
-           ├── InsightsPanel       (violet) AI-generated
-           └── RecommendationsPanel (amber) AI-generated, priority-sorted
+           ├── MetricsPanel           factual metrics (blue accent)
+           ├── InsightsPanel          AI analysis (category cards)
+           └── RecommendationsPanel   priority-sorted, metric-grounded
 ```
 
-**Key design principle:** the AI layer receives a structured JSON payload containing extracted metrics and a plain-text excerpt — never raw HTML. This grounds every AI finding in real, deterministic data.
+### Layer Boundaries (Hard Rules)
 
-Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+| Directory | Owns | Forbidden |
+|-----------|------|-----------|
+| `src/lib/scraper/` | HTTP fetch, Cheerio DOM | OpenAI/Gemini imports, metric logic |
+| `src/lib/metrics/` | Pure extractor functions | AI imports, fetch logic |
+| `src/lib/performance/` | PageSpeed API call | Scraper or metric logic |
+| `src/lib/ai/` | Prompts, Gemini call, Zod validation | Direct fetch, Cheerio |
+| `src/lib/logging/` | Prompt log writer | Business logic |
+| `src/app/api/audit/` | Route orchestration, error handling | Inline prompts, direct AI |
+
+**Key design principle:** The AI layer receives a structured JSON payload containing extracted metrics and a plain-text content excerpt — never raw HTML. This grounds every AI finding in real, deterministic data and eliminates token waste from HTML boilerplate.
+
+Full architecture detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
 ## AI Design Decisions
 
-### 1. Prompt-enforced JSON output
+### 1. Structured input — never raw HTML
 
-The Gemini API call does not use `response_format` (not supported reliably on Gemini's OpenAI-compat endpoint). Instead, the system prompt instructs the model to output only valid JSON matching `AuditInsightsSchema`. The response is stripped of any markdown code fences before parsing, and Zod validates the result before it reaches the API route.
-
-### 2. Metrics extracted first, sent as structured data
-
-The AI layer receives an `AIStructuredInput` object:
+The AI layer receives an `AIStructuredInput` object, not HTML:
 
 ```json
 {
-  "url": "...",
-  "metrics": { "wordCount": 847, "h1Count": 1, ... },
-  "contentExcerpt": "first 5000 characters of body text"
+  "url": "https://example.com",
+  "metrics": {
+    "wordCount": 847,
+    "h1Count": 1,
+    "h2Count": 6,
+    "ctaCount": 4,
+    "altTextPercent": 87.5,
+    "metaTitle": "Example — Build better websites",
+    "seoScore": 91
+  },
+  "contentExcerpt": "first 5 000 characters of body text..."
 }
 ```
 
-The model never sees raw HTML. This prevents token waste, reduces hallucination risk, and ensures every finding can be traced back to a deterministic metric value.
+This prevents hallucination from HTML noise, keeps the prompt within a cost-efficient token budget, and ensures every AI finding can be traced directly to a measurable value.
 
-### 3. Content excerpt truncation at 5000 characters
+### 2. Gemini native SDK with `responseJsonSchema` enforcement
 
-Long pages are truncated to 5000 characters of plain body text. This keeps the prompt within a cost-effective token budget while giving the model enough context to assess messaging, CTA language, and content depth. The truncation boundary is logged so it is visible in prompt logs.
+Rather than using the OpenAI-compatible Gemini endpoint (which doesn't reliably support `response_format`), the tool uses the official `@google/genai` SDK with `responseMimeType: 'application/json'` and `responseJsonSchema` set to the full `AuditInsightsSchema` definition. This forces structured JSON output at the API level before Zod parsing, eliminating most parse failures.
 
-### 4. Retry once on Zod validation failure
+### 3. Model fallback chain for free-tier resilience
 
-If the model returns JSON that fails `AuditInsightsSchema` validation, the call is retried exactly once (`MAX_VALIDATION_RETRIES = 1`). A second failure raises a `ValidationError` and returns an `AI_FAILED` response. This prevents infinite loops while handling rare model lapses gracefully.
+Free-tier Gemini quota is per Google Cloud **project**, not per API key. To handle quota exhaustion and model overload gracefully, a fallback chain is tried in order:
 
-### 5. Prompts in dedicated files, not inline
+```
+gemini-2.5-flash-lite  →  gemini-2.5-flash  →  gemini-2.0-flash-lite  →  gemini-2.0-flash
+```
 
-System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/prompts/user-template.ts`. The API route never contains prompt strings — this makes prompt engineering changes reviewable as code changes, keeps the route handler clean, and allows prompts to be tested independently.
+Each model has its own independent quota bucket. 429 (quota exceeded) and 503 (overloaded) errors skip to the next model. 404 (model not found) errors also skip — this protects against model deprecations without a code deploy.
+
+### 4. Anti-loop system prompt instructions
+
+After observing API token spikes caused by unintentional retry loops, the system prompt now includes explicit operational constraints:
+
+- **Concise output**: model is instructed to keep responses brief and structured
+- **Single pass**: explicitly told it will be called exactly once per audit
+- **Loop detection**: if the model detects repeated identical input, it outputs `[HALT_FLOW: Loop Detected]` and halts
+- **No recursion**: no clarifying questions that would force an automated reply
+
+### 5. Hard call cap and in-flight guard
+
+Beyond the prompt-level instructions, two code-level safeguards prevent request storms:
+
+- `MAX_API_CALLS_PER_REQUEST = 4` — the fallback loop never exceeds 4 Gemini calls regardless of chain length
+- `MODEL_FALLBACK_DELAY_MS = 300` — a 300 ms pause between fallback attempts prevents rapid-fire quota bursts
+- `MAX_VALIDATION_RETRIES = 0` — no retry on Zod validation failure (schema enforcement at the API level makes retries unnecessary and doubles call counts)
+- `inFlight` ref in `useAudit` — a `useRef` lock on the client prevents concurrent duplicate requests from double-clicks or React re-renders
+
+### 6. Prompts in dedicated files, never inline
+
+System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/prompts/user-template.ts`. The API route never contains prompt strings. This makes prompt engineering changes reviewable as code changes, keeps route handlers clean, and allows prompts to be unit-tested independently.
+
+### 7. Every OpenAI call is logged
+
+`writePromptLog()` is called on every Gemini request — even failed ones. Each log contains: full system prompt, rendered user prompt (with all metric values filled in), structured input JSON, raw model output before Zod parsing, model name, timestamp, token usage, and the target URL. Logs write to `docs/prompt-logs/{YYYY-MM-DD}/` in development.
 
 ---
 
@@ -93,44 +141,97 @@ System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/p
 
 | Limitation | Detail |
 |-----------|--------|
-| **CTA heuristic is approximate** | CTAs are detected by tag name, `role="button"`, CSS class keywords (`btn`, `cta`), and link text patterns. JavaScript-rendered buttons and CSS-only styled CTAs are not detected. |
-| **Content truncated at 5000 characters** | Pages longer than ~5000 characters of body text will have their content partially analysed. Deep-page content (footers, FAQs) may not influence AI findings. |
-| **Some sites block headless fetchers** | Pages behind Cloudflare bot protection, login walls, or requiring JavaScript rendering will return a `FETCH_FAILED` error. |
-| **Vercel Hobby plan timeout** | The API route sets `maxDuration = 60` seconds, but Vercel Hobby plan caps serverless functions at 10 seconds. Slow target sites or high Gemini latency may cause timeout errors on Hobby. Upgrade to Pro for reliable 60s execution. |
-| **Single page only** | The tool audits exactly one URL per request. No sitemap crawling, no multi-page analysis. |
-| **In-memory rate limiting** | The API allows 5 requests per IP per 15 minutes. The counter resets on every Vercel cold start and is not shared across serverless instances. |
+| **CTA heuristic is approximate** | CTAs are detected by tag name, `role="button"`, CSS class keywords (`btn`, `cta`, `button`), and link-text patterns. JavaScript-rendered buttons and CSS-only styled CTAs are not detected. |
+| **Content truncated at 5 000 characters** | Pages longer than ~5 000 characters of body text will have content partially analysed. Deep-page content (footers, FAQs) may not influence AI findings. |
+| **Some sites block headless fetchers** | Pages behind Cloudflare bot protection, login walls, or requiring JavaScript rendering return a `FETCH_FAILED` error. A headless browser would be needed to handle these. |
+| **Free-tier quota resets daily** | Gemini's free tier is generous (~1 000 req/day on Flash-Lite) but resets at midnight Pacific. Heavy testing in a single day can exhaust the quota across all fallback models. |
+| **Single page only** | The tool audits exactly one URL per request. No sitemap crawling, no multi-page analysis — by design, as per the assignment brief. |
+| **PageSpeed scores are best-effort** | The Google PageSpeed Insights API has its own rate limits and can time out on slow target sites. When unavailable, scores show as null and the AI notes this explicitly rather than hallucinating a value. |
+| **In-memory rate limiting** | The API allows 5 requests per IP per 15 minutes. This counter resets on Vercel cold starts and is not shared across serverless instances. |
 
 ---
 
-## Future Improvements
+## What I Would Improve With More Time
 
-- ~~Lighthouse integration~~ — implemented in Phase 6 via Google PageSpeed Insights API (see Factual Metrics)
-- **Result caching** — cache `AuditResult` per URL hash (Redis/Vercel KV) to avoid redundant Gemini calls
-- **Side-by-side comparison** — compare two URLs and highlight metric deltas
-- **Export as PDF** — allow users to download the full audit report
-- **Rate limiting** — add IP-based rate limiting on `POST /api/audit` to prevent abuse
-- **JavaScript rendering** — use a headless browser (e.g. Playwright) for JS-heavy SPAs that return empty HTML to a plain fetch
+### Performance & Reliability
+- **Result caching** — cache `AuditResult` per URL hash (Redis / Vercel KV) to avoid redundant Gemini calls for popular URLs
+- **JavaScript rendering** — use Playwright or Puppeteer for JS-heavy SPAs that return near-empty HTML to a plain `fetch`
+- **Streaming responses** — stream AI output token-by-token to the UI so users see insights appearing rather than waiting 10–30 seconds
+
+### AI Quality
+- **Competitor comparison** — accept two URLs and diff the metrics; the AI could identify relative strengths and weaknesses
+- **Confidence scoring** — attach a confidence level to each finding based on data completeness (e.g. lower confidence when `seoScore` is null)
+- **Multi-turn refinement** — allow users to ask follow-up questions grounded in the same audit snapshot without re-fetching
+
+### Product
+- **Export as PDF** — one-click branded PDF report suitable for client delivery
+- **Side-by-side comparison** — compare before/after URLs across a redesign
+- **Scheduled audits** — re-audit a URL on a schedule and alert on metric regressions
+- **Shareable audit links** — persist results and generate a public read-only URL
+
+### Engineering
+- **End-to-end tests** — Playwright tests covering the full happy path, error states, and download flow
+- **OpenTelemetry tracing** — trace each audit request through all layers for production observability
+- **Prompt versioning** — version the system and user prompts so regressions are detectable when prompts change
+
+---
+
+## Cursor AI Development Setup
+
+This project was built using **Cursor** as the primary IDE. Several Cursor-specific configuration files were created to keep the AI agent consistent, safe, and productive across the entire development session.
+
+### `.cursor/rules/` — Persistent Agent Rules
+
+Rules are applied automatically by Cursor whenever the agent edits files matching their glob pattern. They encode architectural boundaries and coding standards that would otherwise need to be re-explained in every prompt.
+
+| Rule File | Scope | Purpose |
+|-----------|-------|---------|
+| `project-context.mdc` | Always applied | Hard constraints: single URL, separate factual/AI, prompt log policy, architecture boundaries |
+| `ai-layer.mdc` | `src/lib/ai/**` | Prompt file location, `responseJsonSchema` usage, grounded-findings requirement, logging on every call |
+| `scraper-layer.mdc` | `src/lib/scraper/**` | No AI imports, no metric logic — pure HTTP fetch and Cheerio DOM only |
+| `typescript-standards.mdc` | `src/**` | No `any` in core layers, Zod for all schemas, import-from-`@/types` rule |
+
+**Why this matters:** Without rules, the AI agent would inline prompts in route handlers, import OpenAI in the scraper layer, or use `any` types under time pressure. The rules function as an automated code reviewer that runs before every edit.
+
+### `.cursor/skills/` — Reusable Agent Playbooks
+
+Skills are instruction files the agent reads on demand to execute complex multi-step tasks reproducibly.
+
+| Skill | Trigger | What It Does |
+|-------|---------|--------------|
+| `website-audit-workflow` | Building or modifying the audit pipeline | Step-by-step checklist: update Zod schema → implement extractor → wire into route → test on real URLs → verify prompt log written |
+| `prompt-logging` | Adding or modifying any Gemini call | Ensures `writePromptLog()` is called correctly, log format is complete, and logs are gitignored except curated examples |
+| `assignment-readme` | Updating project documentation | Ensures README covers all evaluation criteria: architecture, AI decisions, trade-offs, prompt logs, and live demo URL |
+
+**Why this matters:** Skills encode the "how" of recurring tasks so the agent doesn't need to rediscover the correct approach each time. They also encode constraints that are easy to forget under iteration pressure (e.g. "log even on failure").
+
+### `AGENTS.md` — Single Source of Truth
+
+`AGENTS.md` at the repo root is the authoritative specification the Cursor agent reads before any change. It defines:
+- Assignment objective and evaluation criteria
+- Stack decisions with rationale
+- All 11 required factual metrics
+- The `AuditInsights` output schema
+- The CTA detection heuristic
+- Prompt log policy
+- What not to do
+
+By committing `AGENTS.md`, every Cursor session — current or future — starts from the same shared context without needing a project-briefing prompt.
 
 ---
 
 ## Prompt Logs
 
-Prompt logs are a **required deliverable**. They provide full transparency into how the AI layer is orchestrated — including the exact prompts, structured input, and raw model output for each audit.
+Prompt logs are a **required deliverable**. They provide full transparency into how the AI layer is orchestrated.
 
-Curated examples are in [`docs/prompt-logs/examples/`](docs/prompt-logs/examples/):
-
-| File | Demonstrates |
-|------|-------------|
-| [`01-well-grounded.md`](docs/prompt-logs/examples/01-well-grounded.md) | Findings correctly cite specific metric values (`altTextPercent: 87.5`, `ctaCount: 4`) |
-| [`02-edge-case.md`](docs/prompt-logs/examples/02-edge-case.md) | Critical gaps: `h1Count: 0`, `metaDescription: null`, `ctaCount: 0`, `wordCount: 203` |
-| [`03-strong-seo.md`](docs/prompt-logs/examples/03-strong-seo.md) | Strong page — tool gives balanced, constructive feedback rather than over-criticising |
+Curated examples: [`docs/prompt-logs/examples/`](docs/prompt-logs/examples/)
 
 Each log contains:
 - Full system prompt
-- Rendered user prompt (with all metric values filled in)
+- Rendered user prompt (with all metric values substituted in)
 - Structured input JSON sent to the model
 - Raw model output before Zod parsing
-- Model, timestamp, and token usage
+- Model name, timestamp, and token usage
 
 Runtime logs (generated during `npm run dev`) write to `docs/prompt-logs/{YYYY-MM-DD}/` and are gitignored. To promote a runtime log to a curated example, copy it to `docs/prompt-logs/examples/`.
 
@@ -141,26 +242,28 @@ Runtime logs (generated during `npm run dev`) write to `docs/prompt-logs/{YYYY-M
 ```
 src/
 ├── app/
-│   ├── api/audit/        # POST /api/audit — pipeline orchestration
+│   ├── api/audit/        # POST /api/audit — route orchestration only
 │   ├── layout.tsx
 │   └── page.tsx
 ├── lib/
-│   ├── scraper/          # HTTP fetch + Cheerio DOM loading (no AI)
-│   ├── metrics/          # Pure metric extractor functions (no AI)
-│   ├── ai/               # Prompts, OpenAI call, Zod validation
+│   ├── scraper/          # HTTP fetch + Cheerio DOM (zero AI)
+│   ├── metrics/          # 11 pure extractor functions (zero AI)
+│   ├── performance/      # Google PageSpeed Insights fetcher
+│   ├── ai/               # Gemini call, Zod validation, prompt logging
 │   │   └── prompts/      # system.ts + user-template.ts
-│   ├── api/              # Request validation + error mapping
+│   ├── api/              # Request validation + typed error mapping
 │   └── logging/          # Prompt log writer
 ├── components/           # React UI: AuditPage, MetricsPanel, InsightsPanel, etc.
-├── hooks/                # useAudit — client state machine
+├── hooks/                # useAudit — client state machine with in-flight guard
 └── types/                # Shared Zod schemas and TypeScript types
 docs/
 ├── ARCHITECTURE.md       # Detailed architecture documentation
 └── prompt-logs/
     └── examples/         # Curated prompt logs for submission
 .cursor/
-├── rules/                # Cursor agent rules (4 files)
-└── skills/               # Cursor project skills (3 files)
+├── rules/                # 4 Cursor agent rules (always-applied + glob-scoped)
+└── skills/               # 3 Cursor agent skills (workflow playbooks)
+AGENTS.md                 # Authoritative project spec — read before every change
 ```
 
 ---
@@ -170,10 +273,12 @@ docs/
 | Concern | Choice | Reason |
 |---------|--------|--------|
 | Framework | Next.js 15 App Router + TypeScript | Full-stack, API routes, Vercel-ready |
-| Styling | Tailwind CSS v4 | Rapid, consistent, agency-quality UI |
+| Styling | Tailwind CSS v4 | Rapid, consistent UI |
 | HTML parsing | Cheerio | Lightweight, jQuery-like, server-side only |
-| AI provider | Google Gemini 2.5 Flash-Lite | Highest free-tier quota; override with `GEMINI_MODEL` |
+| AI provider | Google Gemini 2.5 Flash-Lite | Highest free-tier quota; model override via `GEMINI_MODEL` |
+| AI SDK | `@google/genai` (official) | Supports both `AIza` and `AQ.` key formats; enables `responseJsonSchema` |
 | Schema validation | Zod | End-to-end type safety from API to UI |
+| Performance data | Google PageSpeed Insights API | Free Lighthouse scores without running a browser |
 | Testing | Vitest | Fast, ESM-native, path alias support |
 | Deployment | Vercel | Native Next.js support |
 
@@ -197,9 +302,9 @@ npm run lint         # ESLint
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GEMINI_API_KEY` | Yes | Google Gemini API key — get a free key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
-| `GEMINI_MODEL` | No | Gemini model id (default: `gemini-2.5-flash-lite` for best free-tier quota) |
-| `GOOGLE_PAGESPEED_API_KEY` | No | Google PageSpeed Insights API key — higher quota; without it the API works at ~2 req/100s per IP |
+| `GEMINI_MODEL` | No | Override the default model (default: `gemini-2.5-flash-lite`) |
+| `GOOGLE_PAGESPEED_API_KEY` | No | Google PageSpeed Insights API key — higher quota; without it the API works at ~2 req/100 s per IP |
 
-**Gemini free-tier note:** Quota is shared per Google Cloud *project*, not per API key. Creating multiple keys in the same project does not increase limits. Use Flash-Lite (default), wait for the daily reset (midnight Pacific), or create a key in a *new* AI Studio project.
+**Gemini free-tier note:** Quota is per Google Cloud *project*, not per API key. Creating multiple keys in the same project does not increase limits. Use Flash-Lite (default), wait for the daily reset (midnight Pacific), or create a key in a *new* AI Studio project at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
 
-Copy `.env.example` to `.env.local` and fill in the key. Never commit `.env.local`.
+Copy `.env.example` to `.env.local` and fill in the values. Never commit `.env.local`.
