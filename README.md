@@ -104,7 +104,7 @@ System and user prompts live in `src/lib/ai/prompts/system.ts` and `src/lib/ai/p
 
 ## Future Improvements
 
-- **Lighthouse integration** — add performance, accessibility, and best-practices scores alongside extracted metrics
+- ~~Lighthouse integration~~ — implemented in Phase 6 via Google PageSpeed Insights API (see Factual Metrics)
 - **Result caching** — cache `AuditResult` per URL hash (Redis/Vercel KV) to avoid redundant OpenAI calls
 - **Side-by-side comparison** — compare two URLs and highlight metric deltas
 - **Export as PDF** — allow users to download the full audit report
@@ -197,5 +197,6 @@ npm run lint         # ESLint
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | OpenAI API key — used by `src/lib/ai/openai-client.ts` |
+| `GOOGLE_PAGESPEED_API_KEY` | No | Google PageSpeed Insights API key — higher quota; without it the API works at ~2 req/100s per IP |
 
 Copy `.env.example` to `.env.local` and fill in the key. Never commit `.env.local`.

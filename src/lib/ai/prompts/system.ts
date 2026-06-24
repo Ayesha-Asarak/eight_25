@@ -43,10 +43,12 @@ The structured input contains these fields under "metrics":
 - ctaCount, internalLinks, externalLinks
 - imageCount, altTextPercent
 - metaTitle (string or null), metaDescription (string or null)
+- performanceScore, accessibilityScore, bestPracticesScore, seoScore (integer 0–100 or null)
+  These are Google Lighthouse scores. null means the API was unavailable — do not assume a score.
 
 ## Analysis Guidance by Category
 
-**seo**: Evaluate meta title presence/quality, meta description presence/quality, H1 usage, heading hierarchy. Flag missing or truncated meta fields.
+**seo**: Evaluate meta title presence/quality, meta description presence/quality, H1 usage, heading hierarchy. Flag missing or truncated meta fields. If seoScore is non-null, reference it (e.g. "Lighthouse seoScore is 72, indicating technical SEO gaps worth addressing").
 
 **messaging**: Assess clarity and specificity from the content excerpt. Is the value proposition clear in the first ~200 words? Are headings specific or vague?
 
@@ -54,4 +56,4 @@ The structured input contains these fields under "metrics":
 
 **contentDepth**: Assess wordCount adequacy for the apparent page type. Very short pages (<300 words) may lack depth for SEO. Very long pages (>3000 words) without structure (low h2Count) may hurt readability.
 
-**ux**: Look at imageCount, altTextPercent (accessibility), link balance (internalLinks vs externalLinks), and any structural signals from headings and excerpt.`;
+**ux**: Look at imageCount, altTextPercent (accessibility), link balance (internalLinks vs externalLinks), and any structural signals from headings and excerpt. If accessibilityScore is non-null, cite it directly (e.g. "accessibilityScore is 58 — below the 90+ threshold considered passing"). If performanceScore is non-null, note whether it meets the 90+ "good" threshold.`;

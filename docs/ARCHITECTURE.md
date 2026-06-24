@@ -57,10 +57,11 @@ sequenceDiagram
 | Layer | Directory | Owns | Forbidden |
 |-------|-----------|------|-----------|
 | **Scraper** | `src/lib/scraper/` | HTTP fetch with timeout and User-Agent; Cheerio DOM loading; public `scrapePage()` entrypoint | OpenAI imports; metric logic |
-| **Metrics** | `src/lib/metrics/` | Pure extractor functions for each metric group; `extractMetrics()` orchestrator; `contentExcerpt` extraction | OpenAI imports; fetch logic |
+| **Metrics** | `src/lib/metrics/` | Pure extractor functions for each metric group; `extractMetrics()` orchestrator; `contentExcerpt` extraction | OpenAI imports; fetch logic; PageSpeed |
+| **Performance** | `src/lib/performance/` | Google PageSpeed Insights API v5 fetch; parse 4 Lighthouse category scores; graceful null fallback | OpenAI imports; Cheerio; metric extraction |
 | **AI** | `src/lib/ai/` | `AIStructuredInput` assembly; system and user prompt rendering; OpenAI API call with `json_schema` output; Zod validation; retry logic | Direct fetch; Cheerio |
 | **Logging** | `src/lib/logging/` | Markdown prompt log formatting; filesystem write (`docs/prompt-logs/{date}/`) | Business logic; metric extraction |
-| **API route** | `src/app/api/audit/` | Request validation; pipeline orchestration; typed error mapping to HTTP responses | Inline prompts; direct OpenAI calls |
+| **API route** | `src/app/api/audit/` | Request validation; parallel orchestration of `scrapePage` + `fetchPageSpeedScores`; typed error mapping | Inline prompts; direct OpenAI calls |
 | **UI** | `src/app/`, `src/components/` | Client state machine (`useAudit`); form; results panels with visual separation | Any server-side logic; AI imports |
 | **Types** | `src/types/` | Zod schemas and inferred TypeScript types shared across all layers | Implementation logic |
 

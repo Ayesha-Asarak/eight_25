@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { scrapePage } from '@/lib/scraper/index';
 import { analyzePage } from '@/lib/ai/index';
+import { fetchPageSpeedScores } from '@/lib/performance/index';
 import { validateAuditRequest } from '@/lib/api/validate-request';
 import { mapToAuditError } from '@/lib/api/map-error';
 import { checkRateLimit } from '@/lib/api/rate-limit';
+import { PageMetricsSchema } from '@/types/audit';
 import type { AuditResponse, AuditErrorResponse } from '@/types/api';
 import type { AuditResult } from '@/types/audit';
 
@@ -37,8 +39,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = await request.json().catch(() => ({}));
     const { url } = validateAuditRequest(body);
 
-    const { metrics, contentExcerpt } = await scrapePage(url);
-    const { insights } = await analyzePage(metrics, contentExcerpt);
+    // Run scrape and PageSpeed in parallel to reduce total latency.
+    // fetchPageSpeedScores never throws — returns null scores on any failure.
+    const [scrapeResult, pageSpeedScores] = await Promise.all([
+      scrapePage(url),
+      fetchPageSpeedScores(url),
+    ]);
+
+    // Merge PageSpeed scores into the DOM metrics and re-validate.
+    const metrics = PageMetricsSchema.parse({
+      ...scrapeResult.metrics,
+      ...pageSpeedScores,
+    });
+
+    const { insights } = await analyzePage(metrics, scrapeResult.contentExcerpt);
 
     const result: AuditResult = {
       metrics,

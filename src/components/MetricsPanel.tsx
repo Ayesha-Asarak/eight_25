@@ -79,6 +79,68 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
           sub={altStatus}
         />
       </div>
+
+      {/* PageSpeed / Lighthouse scores */}
+      <div className="mt-6">
+        <div className="mb-3 flex items-center gap-2">
+          <p className="text-sm font-semibold text-gray-700">
+            PageSpeed / Lighthouse Scores
+          </p>
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">
+            via Google
+          </span>
+        </div>
+        {metrics.performanceScore === null &&
+        metrics.accessibilityScore === null &&
+        metrics.bestPracticesScore === null &&
+        metrics.seoScore === null ? (
+          <p className="text-sm italic text-gray-400">
+            PageSpeed scores unavailable — add{' '}
+            <code className="rounded bg-gray-100 px-1 text-xs">
+              GOOGLE_PAGESPEED_API_KEY
+            </code>{' '}
+            to your environment or the API timed out.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ScoreCard label="Performance" value={metrics.performanceScore} />
+            <ScoreCard label="Accessibility" value={metrics.accessibilityScore} />
+            <ScoreCard label="Best Practices" value={metrics.bestPracticesScore} />
+            <ScoreCard label="SEO" value={metrics.seoScore} />
+          </div>
+        )}
+      </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ScoreCard — colour-coded Lighthouse score display
+// ---------------------------------------------------------------------------
+
+interface ScoreCardProps {
+  label: string;
+  value: number | null;
+}
+
+function scoreColor(value: number): string {
+  if (value >= 90) return 'text-green-600';
+  if (value >= 50) return 'text-amber-600';
+  return 'text-red-600';
+}
+
+function ScoreCard({ label, value }: ScoreCardProps) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-blue-500">{label}</p>
+      {value === null ? (
+        <p className="mt-1 text-xl font-bold italic text-gray-400">N/A</p>
+      ) : (
+        <p className={`mt-1 text-xl font-bold ${scoreColor(value)}`}>
+          {value}
+          <span className="ml-0.5 text-sm font-normal text-gray-400">/100</span>
+        </p>
+      )}
+    </div>
   );
 }

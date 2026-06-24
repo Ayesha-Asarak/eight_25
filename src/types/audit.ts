@@ -19,6 +19,19 @@ export const PageMetricsSchema = z.object({
   altTextPercent: z.number().min(0).max(100),
   metaTitle: z.string().nullable(),
   metaDescription: z.string().nullable(),
+  // ---------------------------------------------------------------------------
+  // Google PageSpeed Insights / Lighthouse scores (0–100, nullable)
+  // null when the API is unavailable, times out, or key is not configured.
+  // Audits always succeed regardless of PageSpeed availability.
+  // ---------------------------------------------------------------------------
+  /** Lighthouse Performance score (0–100) */
+  performanceScore: z.number().int().min(0).max(100).nullable(),
+  /** Lighthouse Accessibility score (0–100) */
+  accessibilityScore: z.number().int().min(0).max(100).nullable(),
+  /** Lighthouse Best Practices score (0–100) */
+  bestPracticesScore: z.number().int().min(0).max(100).nullable(),
+  /** Lighthouse SEO score (0–100) — technical audit, distinct from AI SEO insights */
+  seoScore: z.number().int().min(0).max(100).nullable(),
 });
 
 export type PageMetrics = z.infer<typeof PageMetricsSchema>;

@@ -32,6 +32,13 @@ export function extractMetrics($: CheerioAPI, url: string): PageMetrics {
     ...links,
     ...images,
     ...meta,
+    // PageSpeed scores are fetched externally in the API route (parallel fetch).
+    // They are merged into the metrics object there; default to null here so
+    // this layer never has a dependency on the performance/ layer.
+    performanceScore: null,
+    accessibilityScore: null,
+    bestPracticesScore: null,
+    seoScore: null,
   };
 
   // Validate with Zod to catch shape issues early during development
