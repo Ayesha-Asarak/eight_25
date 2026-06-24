@@ -1,0 +1,51 @@
+---
+description: Scraper and metrics extraction rules — no AI imports allowed in these directories
+globs: "src/lib/scraper/**,src/lib/metrics/**"
+alwaysApply: false
+---
+
+# Scraper & Metrics Layer Rules
+
+## Absolute Prohibition
+
+**Zero imports from `openai` or `src/lib/ai` anywhere in this layer.**
+
+These directories must remain AI-free so metrics stay deterministic and testable independently.
+
+## Pure Functions
+
+All metric extractors follow the same signature:
+
+```ts
+// Input: Cheerio root ($) + page URL
+// Output: a single typed value — no side effects
+export function extractWordCount($: CheerioAPI): number { ... }
+export function extractHeadings($: CheerioAPI): HeadingCounts { ... }
+```
+
+## Fetch Requirements
+
+In `src/lib/scraper/fetch-page.ts`:
+- Timeout: 10 seconds (use `AbortController`)
+- User-Agent: `'Mozilla/5.0 (compatible; WebAuditBot/1.0)'`
+- Max redirects: follow up to 5 (default fetch behavior)
+- Throw typed `FetchError` on network failure or non-2xx status
+
+## CTA Heuristic (Document in Code)
+
+```ts
+// CTA detection heuristic — inherently approximate.
+// Counts: <button>, [role=button], <a> with class containing btn/cta/button/action,
+// <a> with text matching known CTA phrases.
+// Limitation: misses JS-rendered buttons and CSS-only styled CTAs.
+```
+
+## Alt Text Calculation
+
+```ts
+// altTextPercent: % of images WITH a non-empty alt attribute
+// Returns 0 when imageCount === 0 (avoids division-by-zero)
+const altTextPercent = imageCount === 0
+  ? 0
+  : Math.round((imagesWithAlt / imageCount) * 100);
+```

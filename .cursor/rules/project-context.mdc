@@ -1,0 +1,36 @@
+---
+description: Core assignment constraints, architecture boundaries, and project conventions for the EIGHT25 Website Audit Tool
+alwaysApply: true
+---
+
+# Project Context — Website Audit Tool
+
+Read `AGENTS.md` before making any changes. It is the authoritative source of truth.
+
+## Hard Constraints
+
+- **Single URL only** — no multi-page crawling, no sitemap traversal
+- **Factual metrics and AI insights must be separated** — in the UI, in code structure, and in prompts
+- **Every OpenAI call must be logged** — use `src/lib/logging/prompt-logger.ts`
+- **Insights must cite extracted metric values** — no generic recommendations
+
+## Architecture Boundaries
+
+```
+scraper/ → metrics/ → ai/ → logging/
+```
+
+- `src/lib/scraper/` and `src/lib/metrics/`: zero OpenAI imports
+- `src/lib/ai/`: prompts + OpenAI call + Zod validation only
+- Prompts live in `src/lib/ai/prompts/` — never inline in route handlers
+
+## Shared Types
+
+All Zod schemas and inferred types live in `src/types/`. Import from there across layers.
+
+## Required Deliverables
+
+- 8 factual metrics extracted and displayed separately from AI output
+- `AuditInsights` covering: SEO, messaging, CTA, content depth, UX
+- 3–5 prioritized recommendations with `metricRefs`
+- Prompt logs at `docs/prompt-logs/`

@@ -1,0 +1,44 @@
+---
+description: TypeScript standards, Zod usage, and error-handling patterns for the audit tool
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript Standards
+
+## Types and Schemas
+
+- All shared types derived from Zod schemas in `src/types/audit.ts`
+- Use `z.infer<typeof Schema>` — never duplicate type definitions manually
+- No `any` in `src/lib/scraper/`, `src/lib/metrics/`, or `src/lib/ai/`
+
+## Error Handling
+
+Use typed custom errors:
+
+```ts
+// ✅ Typed domain errors
+export class FetchError extends Error {
+  constructor(public readonly url: string, cause: unknown) {
+    super(`Failed to fetch ${url}`);
+    this.cause = cause;
+  }
+}
+
+// ✅ Surface user-friendly messages in API responses
+return NextResponse.json({ error: 'Could not reach that URL. Check it is publicly accessible.' }, { status: 422 });
+```
+
+## Null Safety
+
+- `metaTitle` and `metaDescription` are `string | null` — handle both cases
+- `altTextPercent` returns `0` when `imageCount === 0` (no division-by-zero)
+
+## API Route Return Types
+
+Always return a typed response shape — never `any` or untyped JSON:
+
+```ts
+// src/types/api.ts defines AuditResponse and AuditErrorResponse
+return NextResponse.json<AuditResponse>(payload);
+```

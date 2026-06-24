@@ -1,0 +1,62 @@
+---
+description: AI prompt design, OpenAI integration conventions, and prompt logging requirements for src/lib/ai
+globs: "src/lib/ai/**"
+alwaysApply: false
+---
+
+# AI Layer Conventions
+
+## Prompt Files
+
+Prompts live **only** in `src/lib/ai/prompts/`:
+
+```
+src/lib/ai/prompts/
+  system.ts        ← static system prompt string
+  user-template.ts ← function: (PageMetrics, contentExcerpt) → string
+```
+
+Never write prompt strings inline in API route handlers or `analyze-page.ts`.
+
+## OpenAI Structured Output
+
+Always use JSON schema mode for reliable parsing:
+
+```ts
+response_format: {
+  type: 'json_schema',
+  json_schema: {
+    name: 'audit_insights',
+    strict: true,
+    schema: { /* derived from AuditInsightsSchema */ }
+  }
+}
+```
+
+Validate the response with `AuditInsightsSchema.parse()`. Retry once on `ZodError`.
+
+## Grounded Findings
+
+Every `finding` string must reference a metric key and its value:
+
+```ts
+// ✅ Grounded
+"h1Count is 0 — no primary heading found on this page"
+
+// ✗ Generic
+"You should improve your heading structure"
+```
+
+## Prompt Logging (Required)
+
+Call `writePromptLog()` on **every** OpenAI request — before or after the call succeeds:
+
+```ts
+import { writePromptLog } from '@/lib/logging/prompt-logger';
+// Log immediately after getting rawModelOutput
+await writePromptLog({ id, url, systemPrompt, userPrompt, structuredInput, rawModelOutput, ... });
+```
+
+## Content Truncation
+
+Send at most 5000 characters of main body text as `contentExcerpt`. Label it clearly in the prompt. Never send raw HTML.
