@@ -162,39 +162,31 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
         />
       </div>
 
-      {/* PageSpeed / Lighthouse */}
-      <div className="mt-5">
-        <div className="flex items-center gap-2 mb-3">
-          <p className="text-sm font-semibold" style={{ color: '#374151' }}>
-            PageSpeed / Lighthouse Scores
-          </p>
-          <span
-            className="rounded-full px-2 py-0.5 text-xs font-medium"
-            style={{ backgroundColor: '#EFF6FF', color: '#3B5BDB' }}
-          >
-            via Google
-          </span>
-        </div>
-        {metrics.performanceScore === null &&
-        metrics.accessibilityScore === null &&
-        metrics.bestPracticesScore === null &&
-        metrics.seoScore === null ? (
-          <p className="text-sm italic" style={{ color: '#9CA3AF' }}>
-            PageSpeed scores unavailable — add{' '}
-            <code className="rounded px-1 text-xs" style={{ backgroundColor: '#F3F4F6' }}>
-              GOOGLE_PAGESPEED_API_KEY
-            </code>{' '}
-            to your environment or the API timed out.
-          </p>
-        ) : (
+      {/* PageSpeed / Lighthouse — only shown when scores are available */}
+      {(metrics.performanceScore !== null ||
+        metrics.accessibilityScore !== null ||
+        metrics.bestPracticesScore !== null ||
+        metrics.seoScore !== null) && (
+        <div className="mt-5">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="text-sm font-semibold" style={{ color: '#374151' }}>
+              PageSpeed / Lighthouse Scores
+            </p>
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ backgroundColor: '#EFF6FF', color: '#3B5BDB' }}
+            >
+              via Google
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <ScoreCard label="Performance" value={metrics.performanceScore} />
             <ScoreCard label="Accessibility" value={metrics.accessibilityScore} />
             <ScoreCard label="Best Practices" value={metrics.bestPracticesScore} />
             <ScoreCard label="SEO" value={metrics.seoScore} />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
