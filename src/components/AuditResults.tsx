@@ -11,12 +11,14 @@ interface AuditResultsProps {
 
 function formatAuditedAt(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
-/** Derives a safe filename from a URL (strips protocol, replaces special chars). */
 function urlToFilename(url: string): string {
   return url
     .replace(/^https?:\/\//, '')
@@ -41,52 +43,58 @@ function downloadJson(result: AuditResult): void {
 
 export function AuditResults({ result }: AuditResultsProps) {
   return (
-    <div className="space-y-10">
-      {/* Audit metadata */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-        <div>
-          <span className="font-medium text-gray-800">Audited:</span>{' '}
+    <div className="space-y-6">
+      {/* ── Audited bar ───────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm" style={{ color: '#6B7280' }}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span style={{ color: '#374151' }}>Audited:</span>
           <a
             href={result.metrics.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-all text-blue-600 hover:underline"
+            className="break-all font-medium hover:underline"
+            style={{ color: '#3B5BDB' }}
           >
             {result.metrics.url}
-          </a>{' '}
-          <span className="mx-2 text-gray-300">·</span>
+          </a>
+          <span style={{ color: '#D1D5DB' }}>·</span>
           <time dateTime={result.auditedAt}>{formatAuditedAt(result.auditedAt)}</time>
         </div>
         <button
           onClick={() => downloadJson(result)}
-          className="shrink-0 rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+          className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition hover:bg-white"
+          style={{ color: '#374151', border: '1px solid #D1D5DB', backgroundColor: 'transparent' }}
           aria-label="Download full audit report as JSON"
         >
           Download JSON
         </button>
       </div>
 
-      {/* ── FACTUAL METRICS ─────────────────────────────────── */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-6">
+      {/* ── Factual Metrics ───────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-6">
         <MetricsPanel metrics={result.metrics} />
       </div>
 
-      {/* ── DIVIDER ─────────────────────────────────────────── */}
-      <div className="relative flex items-center">
-        <div className="flex-1 border-t border-gray-200" />
-        <span className="mx-4 shrink-0 rounded-full border border-violet-200 bg-violet-50 px-4 py-1 text-xs font-medium text-violet-600">
-          AI‑generated analysis below
+      {/* ── Divider ───────────────────────────────────────────── */}
+      <div className="relative flex items-center py-2">
+        <div className="flex-1" style={{ borderTop: '1px solid #E5E7EB' }} />
+        <span
+          className="mx-4 shrink-0 rounded-full px-4 py-1.5 text-xs font-medium flex items-center gap-1.5"
+          style={{ border: '1px solid #E5E7EB', backgroundColor: 'white', color: '#6B7280' }}
+        >
+          <span style={{ color: '#3B5BDB' }}>+</span>
+          AI-Generated Analysis
         </span>
-        <div className="flex-1 border-t border-gray-200" />
+        <div className="flex-1" style={{ borderTop: '1px solid #E5E7EB' }} />
       </div>
 
-      {/* ── AI INSIGHTS ─────────────────────────────────────── */}
-      <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-6">
+      {/* ── AI Insights ───────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-6">
         <InsightsPanel insights={result.insights} />
       </div>
 
-      {/* ── RECOMMENDATIONS ─────────────────────────────────── */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-6">
+      {/* ── Recommendations ───────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-6">
         <RecommendationsPanel recommendations={result.insights.recommendations} />
       </div>
     </div>

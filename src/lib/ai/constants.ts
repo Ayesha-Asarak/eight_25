@@ -45,5 +45,19 @@ export const CONTENT_EXCERPT_MAX_LENGTH = 5000;
 /** Cap completion size — audit JSON rarely exceeds ~3k tokens */
 export const MAX_OUTPUT_TOKENS = 4096;
 
-/** Number of times to retry after a Zod validation failure */
-export const MAX_VALIDATION_RETRIES = 1;
+/**
+ * Validation retries after a Zod parse failure.
+ * Set to 0: the model is forced to output valid JSON via responseJsonSchema,
+ * so a parse failure means something fundamental is wrong — retrying just
+ * burns quota and can trigger 429 loops.
+ */
+export const MAX_VALIDATION_RETRIES = 0;
+
+/**
+ * Hard cap on total Gemini API calls per single user request (across all
+ * fallback models). Prevents runaway loops if the fallback chain is expanded.
+ */
+export const MAX_API_CALLS_PER_REQUEST = 4;
+
+/** Milliseconds to wait between model fallback attempts to avoid rate bursts */
+export const MODEL_FALLBACK_DELAY_MS = 300;

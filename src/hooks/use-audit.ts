@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { AuditResult } from '@/types/audit';
 import type { AuditErrorResponse } from '@/types/api';
 
@@ -33,8 +33,15 @@ const IDLE: IdleState = { status: 'idle' };
 
 export function useAudit(): UseAuditReturn {
   const [state, setState] = useState<AuditState>(IDLE);
+  // Prevents concurrent requests — extra defense beyond the disabled button state
+  const inFlight = useRef(false);
 
   const runAudit = useCallback(async (url: string) => {
+    if (inFlight.current) {
+      console.warn('[useAudit] Request already in flight — ignoring duplicate call');
+      return;
+    }
+    inFlight.current = true;
     setState({ status: 'loading' });
 
     try {
@@ -65,6 +72,8 @@ export function useAudit(): UseAuditReturn {
         error: 'Could not connect to the server. Check your network and try again.',
         code: 'UNKNOWN',
       });
+    } finally {
+      inFlight.current = false;
     }
   }, []);
 

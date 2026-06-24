@@ -2,6 +2,8 @@ import { GoogleGenAI } from '@google/genai';
 import {
   getModelFallbackChain,
   MAX_OUTPUT_TOKENS,
+  MAX_API_CALLS_PER_REQUEST,
+  MODEL_FALLBACK_DELAY_MS,
 } from './constants';
 import { GEMINI_AUDIT_INSIGHTS_SCHEMA } from './schema';
 import {
@@ -73,11 +75,24 @@ export async function callGemini(params: {
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const models = getModelFallbackChain();
+  const models = getModelFallbackChain().slice(0, MAX_API_CALLS_PER_REQUEST);
   let lastQuotaErr: unknown;
   let lastUnavailableErr: unknown;
+  let callCount = 0;
 
   for (const model of models) {
+    // Hard cap — never exceed MAX_API_CALLS_PER_REQUEST regardless of chain length
+    if (callCount >= MAX_API_CALLS_PER_REQUEST) {
+      console.warn('[ai] hard call cap reached — stopping fallback chain');
+      break;
+    }
+
+    // Brief pause between attempts to avoid rapid-fire quota bursts
+    if (callCount > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, MODEL_FALLBACK_DELAY_MS));
+    }
+
+    callCount++;
     try {
       const response = await ai.models.generateContent({
         model,

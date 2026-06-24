@@ -1,26 +1,11 @@
 import type { Recommendation } from '@/types/audit';
 
-const PRIORITY_STYLES: Record<number, { badge: string; border: string }> = {
-  1: {
-    badge: 'bg-red-100 text-red-700',
-    border: 'border-l-red-400',
-  },
-  2: {
-    badge: 'bg-orange-100 text-orange-700',
-    border: 'border-l-orange-400',
-  },
-  3: {
-    badge: 'bg-amber-100 text-amber-700',
-    border: 'border-l-amber-400',
-  },
-  4: {
-    badge: 'bg-blue-100 text-blue-700',
-    border: 'border-l-blue-400',
-  },
-  5: {
-    badge: 'bg-gray-100 text-gray-600',
-    border: 'border-l-gray-300',
-  },
+const PRIORITY_COLORS: Record<number, { accent: string; badge: string; badgeBg: string }> = {
+  1: { accent: '#DC2626', badge: '#DC2626', badgeBg: '#FEE2E2' },
+  2: { accent: '#EA580C', badge: '#EA580C', badgeBg: '#FFEDD5' },
+  3: { accent: '#D97706', badge: '#D97706', badgeBg: '#FEF3C7' },
+  4: { accent: '#3B5BDB', badge: '#3B5BDB', badgeBg: '#EFF6FF' },
+  5: { accent: '#6B7280', badge: '#6B7280', badgeBg: '#F3F4F6' },
 };
 
 interface RecommendationCardProps {
@@ -29,33 +14,42 @@ interface RecommendationCardProps {
 }
 
 function RecommendationCard({ rec, index }: RecommendationCardProps) {
-  const style = PRIORITY_STYLES[rec.priority] ?? PRIORITY_STYLES[5];
+  const colors = PRIORITY_COLORS[rec.priority] ?? PRIORITY_COLORS[5];
 
   return (
     <div
-      className={`rounded-lg border border-gray-200 border-l-4 ${style.border} bg-white p-5 shadow-sm`}
+      className="rounded-xl p-5"
+      style={{
+        backgroundColor: '#fff',
+        border: '1px solid #E5E7EB',
+        borderLeft: `4px solid ${colors.accent}`,
+      }}
     >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <h3 className="font-semibold text-gray-900">
-          <span className="mr-2 text-gray-400">#{index + 1}</span>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <h3 className="font-semibold text-sm leading-snug" style={{ color: '#111827' }}>
+          <span className="mr-2 font-normal" style={{ color: '#9CA3AF' }}>#{index + 1}</span>
           {rec.title}
         </h3>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${style.badge}`}
+          className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold"
+          style={{ color: colors.badge, backgroundColor: colors.badgeBg }}
         >
           P{rec.priority}
         </span>
       </div>
 
-      <p className="mb-3 text-sm text-gray-600">{rec.reasoning}</p>
+      <p className="text-sm mb-3 leading-relaxed" style={{ color: '#6B7280' }}>
+        {rec.reasoning}
+      </p>
 
       {rec.metricRefs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          <span className="text-xs text-gray-400">Grounded in:</span>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs" style={{ color: '#9CA3AF' }}>Grounded in:</span>
           {rec.metricRefs.map((ref) => (
             <span
               key={ref}
-              className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600"
+              className="rounded px-2 py-0.5 font-mono text-xs"
+              style={{ backgroundColor: '#F3F4F6', color: '#374151' }}
             >
               {ref}
             </span>
@@ -75,17 +69,27 @@ export function RecommendationsPanel({ recommendations }: RecommendationsPanelPr
 
   return (
     <section aria-labelledby="recs-heading">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 id="recs-heading" className="text-lg font-bold text-gray-900">
-            Recommendations
-          </h2>
-          <p className="text-sm text-amber-600">
-            Prioritised by business impact — grounded in extracted metrics
-          </p>
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="flex items-start gap-3">
+          <div
+            className="shrink-0 w-1 self-stretch rounded-full mt-0.5"
+            style={{ backgroundColor: '#D97706' }}
+            aria-hidden="true"
+          />
+          <div>
+            <h2 id="recs-heading" className="text-lg font-bold" style={{ color: '#111827' }}>
+              Recommendations
+            </h2>
+            <p className="text-sm" style={{ color: '#D97706' }}>
+              Prioritised by business impact — grounded in extracted metrics
+            </p>
+          </div>
         </div>
-        <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-          AI‑generated
+        <span
+          className="shrink-0 text-xs font-semibold uppercase tracking-widest rounded px-2 py-1"
+          style={{ color: '#6B7280', border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB' }}
+        >
+          AI-Generated
         </span>
       </div>
 
